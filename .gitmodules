@@ -1,0 +1,3 @@
+[submodule "py-rpc-host"]
+	path = py-rpc-host
+	url = https://github.com/dansgithubuser/py-rpc-host
