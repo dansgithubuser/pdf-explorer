@@ -24,10 +24,23 @@ function apiPdf(attr, options) {
   return api(options.op, `${gPdf}.${attr}`, [options.args, options.kwargs]);
 }
 
+function render() {
+  var v = '';
+  v += '<pre>';
+  if (typeof gObject === 'object') {
+    v += '<<\n';
+    for (const i in gObject) v += `\t${i} ${gObject[i]}\n`;
+    v += '>>';
+  }
+  v += '</pre>';
+  e('view').innerHTML = v;
+}
+
 async function load() {
   gPdf = await api('store', 'Pdf');
   await apiPdf('load', { args: [v('file')] });
   gObject = await apiPdf('root', { op: 'get' });
+  render();
 }
 
 window.onload = () => {
@@ -38,5 +51,7 @@ window.onload = () => {
 };
 
 </script>
-file: <input type='text' id='file' size=40>
-<input type='button' id='load' value='load'>
+
+file: <input type='text' id='file' size=40> <input type='button' id='load' value='load'><br>
+<br>
+<div id='view'></div>
