@@ -3,20 +3,31 @@
 const API_HOST = 'http://localhost:8000/';
 
 var gPdf;
+var gObject;
 
 function e(id) { return document.getElementById(id); }
 function v(id) { return e(id).value; }
 
-function api(op, path, body) {
+function api(op, path, params) {
   return fetch(API_HOST + op + '/' + path, {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: JSON.stringify(params),
   }).then(r => r.json());
+}
+
+function apiPdf(attr, options) {
+  options = {
+    args: options.args || [],
+    kwargs: options.kwargs || {},
+    op: options.op || 'eval',
+  };
+  return api(options.op, `${gPdf}.${attr}`, [options.args, options.kwargs]);
 }
 
 async function load() {
   gPdf = await api('store', 'Pdf');
-  api('eval', `${gPdf}.load`, [[v('file')]]);
+  await apiPdf('load', { args: [v('file')] });
+  gObject = await apiPdf('root', { op: 'get' });
 }
 
 window.onload = () => {

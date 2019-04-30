@@ -23,6 +23,8 @@ class Name:
     def __repr__(self):
         return '/{}'.format(self.value)
 
+    def to_json(self): return repr(self)
+
 class Stream:
     def __init__(self, dictionary, stream):
         self.dictionary = dictionary
@@ -52,6 +54,8 @@ class Ref:
 
     def __repr__(self):
         return '{} {}'.format(self.object_number, self.generation_number)
+
+    def to_json(self): return repr(self)
 
 class Parser:
     def __init__(self, content):
