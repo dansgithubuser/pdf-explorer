@@ -16,7 +16,7 @@ function api(op, path, body) {
 
 async function load() {
   gPdf = await api('store', 'Pdf');
-  api('eval', 'Pdf.load', { self: gPdf, file_name: v('file') });
+  api('eval', `${gPdf}.load`, [[v('file')]]);
 }
 
 window.onload = () => {
