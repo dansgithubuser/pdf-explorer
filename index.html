@@ -7,8 +7,8 @@ var gPdf;
 function e(id) { return document.getElementById(id); }
 function v(id) { return e(id).value; }
 
-function api(command, path, body) {
-  return fetch(API_HOST + command + '/' + path, {
+function api(op, path, body) {
+  return fetch(API_HOST + op + '/' + path, {
     method: 'POST',
     body: JSON.stringify(body),
   }).then(r => r.json());
@@ -16,7 +16,7 @@ function api(command, path, body) {
 
 async function load() {
   gPdf = await api('store', 'Pdf');
-  api('get', 'Pdf/load', { self: gPdf, file_name: v('file') });
+  api('eval', 'Pdf.load', { self: gPdf, file_name: v('file') });
 }
 
 window.onload = () => {
