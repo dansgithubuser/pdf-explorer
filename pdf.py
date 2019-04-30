@@ -242,7 +242,7 @@ class Pdf:
         return self
 
     def root(self):
-        return self.objects[self.trailer['dictionary']['Root']]
+        return self.objects[self.trailer[-1]['dictionary']['Root']]
 
     def object(self, object_number, generation_number=0):
         return self.objects[Ref(object_number, generation_number)]
