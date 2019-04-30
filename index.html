@@ -1,1 +1,31 @@
-<a href='http://localhost:8000'>lol!</a>
+<script>
+
+const API_HOST = 'http://localhost:8000/';
+
+var gPdf;
+
+function e(id) { return document.getElementById(id); }
+function v(id) { return e(id).value; }
+
+function api(command, path, body) {
+  return fetch(API_HOST + command + '/' + path, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  }).then(r => r.json());
+}
+
+async function load() {
+  gPdf = await api('store', 'Pdf');
+  api('get', 'Pdf/load', { self: gPdf, file_name: v('file') });
+}
+
+window.onload = () => {
+  e('file').addEventListener('keyup', function(event) {
+    if (event.keyCode === 13) load();
+  });
+  e('load').addEventListener('click', load);
+};
+
+</script>
+file: <input type='text' id='file' size=40>
+<input type='button' id='load' value='load'>

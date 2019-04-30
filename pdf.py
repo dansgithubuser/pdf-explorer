@@ -172,6 +172,12 @@ class Parser:
         raise Exception('unknown object at line {}, index {}'.format(self.line, self.i))
 
 class Pdf:
+    def __init__(self):
+        self.header = []
+        self.objects = {}
+        self.xref = {}
+        self.trailer = {}
+
     def __repr__(self):
         return (
             '===== header =====\n'
