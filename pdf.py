@@ -38,13 +38,15 @@ class Stream:
 
 class Ref:
     def __init__(self, *args):
-        if len(args) == 1:
-            literal = args[0]
-            self.object_number, self.generation_number = [int(i) for i in literal.split()[:2]]
-        elif len(args) == 2:
+        types = [type(i) for i in args]
+        if types == [str]:
+            self.object_number, self.generation_number = [int(i) for i in args[0].split()[:2]]
+        elif types == [int]:
+            self.object_number, self.generation_number = args[0], 0
+        elif types == [int, int]:
             self.object_number, self.generation_number = args
         else:
-            raise Exception('wrong number of arguments')
+            raise Exception('invalid arguments {}'.format(args))
 
     def __eq__(self, other):
         return (self.object_number, self.generation_number) == (other.object_number, other.generation_number)
@@ -203,9 +205,7 @@ class Pdf:
         ).format(self.header, pprint.pformat(self.objects), pprint.pformat(self.xref), pprint.pformat(self.trailer))
 
     def __getitem__(self, key):
-        if type(key) == int: return self.object(key)
-        elif isinstance(key, Ref): return self.objects[key]
-        else: raise Exception('bad key type')
+        return self.objects(key)
 
     def load(self, file_name):
         with open(file_name, 'rb') as f: parser = Parser(f.read())
@@ -248,8 +248,8 @@ class Pdf:
     def root(self):
         return self.trailer[-1]['dictionary']['Root']
 
-    def object(self, object_number, generation_number=0):
-        return self.objects[Ref(object_number, generation_number)]
+    def object(self, *args):
+        return self.objects[Ref(*args)]
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
