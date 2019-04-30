@@ -95,7 +95,7 @@ class Parser:
             return float(x)
         not_raw_paren = (
             r'(?:'
-                r'[^()]|\\\(|\\\)'
+                r'[^\\()]|\\.'
             r')*'
         )
         pattern_string_literal = (
@@ -110,6 +110,11 @@ class Parser:
             r')\)'
         )
         def transform_string_literal(x):
+            if x[0:2] == b'\xfe\xff':
+                x = x.decode('utf-16')
+            else:
+                try: x = x.decode()
+                except: return x
             for k, v in {
                 r'\n': '\n',
                 r'\r': '\r',
@@ -156,18 +161,18 @@ class Parser:
                 self._advance(e)
                 self.parse(r'\s*endstream', _depth=_depth)
             return result
-        for pattern, transform in [
-            (pattern_name, lambda x: Name(x[0])),
-            ('\d+ \d+ R', Ref),
-            (r'[+-]?\d?\.?\d*', transform_number),
-            (pattern_string_literal, lambda x: transform_string_literal(x[0])),
-            (r'<<', transform_dictionary_or_stream),
-            (r'\[', transform_array),
-            ('<(.*?)>', lambda x: transform_string_hexadecimal(x[0])),
-            ('true', lambda x: True),
-            ('false', lambda x: False),
+        for pattern, transform, kwargs in [
+            (pattern_name, lambda x: Name(x[0]), {}),
+            ('\d+ \d+ R', Ref, {}),
+            (r'[+-]?\d?\.?\d*', transform_number, {}),
+            (pattern_string_literal, lambda x: transform_string_literal(x[0]), {'binary': True}),
+            (r'<<', transform_dictionary_or_stream, {}),
+            (r'\[', transform_array, {}),
+            ('<(.*?)>', lambda x: transform_string_hexadecimal(x[0]), {}),
+            ('true', lambda x: True, {}),
+            ('false', lambda x: False, {}),
         ]:
-            obj = self.parse(pattern, allow_nonmatch=True, _depth=_depth)
+            obj = self.parse(pattern, allow_nonmatch=True, **kwargs, _depth=_depth)
             if obj is not None: return transform(obj)
         raise Exception('unknown object at line {}, index {}'.format(self.line, self.i))
 
@@ -176,7 +181,7 @@ class Pdf:
         self.header = []
         self.objects = {}
         self.xref = {}
-        self.trailer = {}
+        self.trailer = []
 
     def __repr__(self):
         return (
@@ -204,37 +209,35 @@ class Pdf:
         self.header = [parser.parse(r'%([^\n\r]*)')]
         x = parser.parse(r'%([^\n\r]*)', allow_nonmatch=True, binary=True)
         if x: self.header.append(x[0])
-        # body
-        self.objects = {}
-        while not parser.check('xref|startxref'):
-            ref = Ref(parser.parse(r'\d+ \d+ obj'))
-            self.objects[ref] = parser.parse_object()
-            parser.parse('endobj')
-        # XFA
-        if parser.check('startxref'):
-            raise Exception("sorry, this isn't actually a PDF, it looks to be XFA")
-        # cross-reference table
-        parser.parse('xref')
-        self.xref = {}
-        while not parser.check('trailer'):
-            object_0, object_n = [int(i) for i in parser.parse(r'[^\n\r]*').split()]
-            for i in range(object_n):
-                ref, free = parser.parse('(\d+ \d+) ([fn])')
-                self.xref[object_0 + i] = {
-                    'ref': Ref(ref),
-                    'free': free == 'f',
-                }
-        # trailer
-        parser.parse('trailer')
-        dictionary = parser.parse_object()
-        parser.parse('startxref')
-        startxref = int(parser.parse('\d+'))
-        self.trailer = {
-            'dictionary': dictionary,
-            'startxref': startxref,
-        }
-        parser.parse('%%EOF')
-        assert(parser.i == len(parser.content))
+        while parser.i < len(parser.content):
+            # body
+            while not parser.check('xref|startxref'):
+                ref = Ref(parser.parse(r'\d+ \d+ obj'))
+                self.objects[ref] = parser.parse_object()
+                parser.parse('endobj')
+            # XFA
+            if parser.check('startxref'):
+                raise Exception("sorry, this isn't actually a PDF, it looks to be XFA")
+            # cross-reference table
+            parser.parse('xref')
+            while not parser.check('trailer'):
+                object_0, object_n = [int(i) for i in parser.parse(r'[^\n\r]*').split()]
+                for i in range(object_n):
+                    ref, free = parser.parse('(\d+ \d+) ([fn])')
+                    self.xref[object_0 + i] = {
+                        'ref': Ref(ref),
+                        'free': free == 'f',
+                    }
+            # trailer
+            parser.parse('trailer')
+            dictionary = parser.parse_object()
+            parser.parse('startxref')
+            startxref = int(parser.parse('\d+'))
+            self.trailer.append({
+                'dictionary': dictionary,
+                'startxref': startxref,
+            })
+            parser.parse(r'%%EOF\s*')
         # return so we can use something like named constructor idiom
         return self
 
