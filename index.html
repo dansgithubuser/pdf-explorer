@@ -1,9 +1,30 @@
+<style>
+
+.ref {
+  color: rgb(0, 192, 0);
+  text-decoration: underline;
+  text-decoration-color: rgb(0, 192, 0);
+}
+
+.ref:hover {
+  cursor: pointer;
+}
+
+</style>
+
 <script>
 
 const API_HOST = 'http://localhost:8000/';
 
 var gPdf;
-var gObject;
+var gObjs;
+
+class Obj {
+  constructor(identifier, obj) {
+    this.identifier = identifier;
+    this.obj = obj;
+  }
+};
 
 function e(id) { return document.getElementById(id); }
 function v(id) { return e(id).value; }
@@ -15,31 +36,72 @@ function api(op, path, params) {
   }).then(r => r.json());
 }
 
-function apiPdf(attr, options) {
+function apiPdf(attr, options = {}) {
   options = {
     args: options.args || [],
     kwargs: options.kwargs || {},
-    op: options.op || 'eval',
+    op: options.op || 'get',
   };
   return api(options.op, `${gPdf}.${attr}`, [options.args, options.kwargs]);
 }
 
-function render() {
-  var v = '';
-  v += '<pre>';
-  if (typeof gObject === 'object') {
-    v += '<<\n';
-    for (const i in gObject) v += `\t${i} ${gObject[i]}\n`;
-    v += '>>';
+function apiPdfObj(ref) {
+  return apiPdf('object', { args: [ref] });
+}
+
+async function dive(parent, ref) {
+  const obj = await apiPdfObj(ref);
+  gObjs.push(new Obj(ref, obj));
+  render();
+}
+
+function isRef(obj) {
+  const split = obj.split(' ');
+  if (split.length != 2) return false;
+  for (const i of split)
+    if (parseInt(i) != i) return false;
+  return true;
+}
+
+function prepare(obj, parent, indent = 0, prefix = '') {
+  var result = '\t'.repeat(indent) + prefix;
+  if (obj.constructor == String && isRef(obj)) {
+    result += `<span class="ref" onclick="dive('${parent}', '${obj}')">${obj}</span>`;
+  } else if (obj.constructor == Array) {
+    result += '[\n';
+    for (const i of obj)
+      result += prepare(i, parent, indent + 1) + ',\n';
+    result += '\t'.repeat(indent) + ']';
+  } else if (obj.constructor == Object) {
+    result += '<<\n';
+    for (const k in obj)
+      result += prepare(obj[k], parent, indent + 1, `${k} `) + '\n';
+    result += '\t'.repeat(indent) + '>>';
+  } else {
+    result += `${obj}`;
   }
-  v += '</pre>';
-  e('view').innerHTML = v;
+  return result;
+}
+
+function render() {
+  var view = '';
+  var preI = 0;
+  for (obj of gObjs) {
+    const preId = `pre${preI}`;
+    view += `<pre id='${preId}'>${obj.identifier} obj `;
+    view += prepare(obj.obj, preId);
+    view += '</pre>';
+    ++preI;
+  }
+  e('view').innerHTML = view;
 }
 
 async function load() {
   gPdf = await api('store', 'Pdf');
-  await apiPdf('load', { args: [v('file')] });
-  gObject = await apiPdf('root', { op: 'get' });
+  await apiPdf('load', { op: 'eval', args: [v('file')] });
+  const rootRef = await apiPdf('root');
+  const root = await apiPdfObj(rootRef);
+  gObjs = [new Obj(rootRef, root)];
   render();
 }
 
