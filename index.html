@@ -75,6 +75,7 @@ function shouldPutOnSingleLine(obj, depth = 0) {
       if (!shouldPutOnSingleLine(i, depth + 1))
         return false;
   } else if (obj.constructor == Object) {
+    if (obj.pdf_py_meta && obj.pdf_py_meta.type == 'stream') return false;
     if (Object.keys(obj).length > 1) return false;
     for (const k in obj)
       if (!shouldPutOnSingleLine(obj[k], depth + 1))
@@ -84,16 +85,18 @@ function shouldPutOnSingleLine(obj, depth = 0) {
 }
 
 function prepareCollection(obj, parent, indent, start, end, prepareElement) {
-  var result = '';
   const singleLine = shouldPutOnSingleLine(obj);
+  var result = '';
+  var decoded;
   result += start;
   if (!singleLine)
     result += '\n';
   keys = obj;
   if (obj.constructor == Array) keys = Array.from({ length: obj.length }, (v, i) => i);
   for (const k in keys) {
-    if (k == 'pdf_py_meta') {
+    if (k == 'pdf_py_meta' && obj[k].type == 'stream') {
       result = 'stream ' + result;
+      decoded = obj[k].decoded;
       continue;
     }
     if (singleLine) {
@@ -107,6 +110,13 @@ function prepareCollection(obj, parent, indent, start, end, prepareElement) {
   if (!singleLine)
     result += '\t'.repeat(indent);
   result += end;
+  if (decoded) {
+    if (singleLine)
+      result += ' ';
+    else
+      result += '\n';
+    result += decoded;
+  }
   return result;
 }
 

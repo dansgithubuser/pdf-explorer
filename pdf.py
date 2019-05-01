@@ -10,6 +10,7 @@ import os
 import pprint
 import string
 import sys
+import zlib
 
 class Name:
     escape_regex = re.compile('#([0-9a-fA-F]{2})')
@@ -18,6 +19,7 @@ class Name:
         self.value = Name.escape_regex.sub(lambda m: chr(int(m.group(1), 16)), literal)
 
     def __eq__(self, other):
+        if not isinstance(other, Name): return False
         return self.value == other.value
 
     def __repr__(self):
@@ -29,17 +31,24 @@ class Stream:
     def __init__(self, dictionary, stream):
         self.dictionary = dictionary
         self.stream = stream
+        self.decoded = None
+        if self.dictionary.get('Filter') == Name('FlateDecode'):
+            try: self.decoded = zlib.decompress(self.stream).decode('utf-8')
+            except Exception as e: self.decoded = repr(e)
 
     def __eq__(self, other):
+        if not isinstance(other, Stream): return False
         return (self.dictionary, self.stream) == (other.dictionary, other.stream)
 
     def __repr__(self):
-        return 'Stream({} {})'.format(pprint.pformat(self.dictionary), hash(self.stream))
+        return 'Stream({} {})'.format(pprint.pformat(self.dictionary), self.decoded or hash(self.stream))
 
     def to_json(self):
         uniquifier = 'pdf_py_meta'
         assert uniquifier not in self.dictionary
-        return dict(self.dictionary, **{uniquifier: 'stream'})
+        return dict(self.dictionary, **{
+            uniquifier: {'type': 'stream', 'decoded': self.decoded},
+        })
 
 class Ref:
     def __init__(self, *args):
@@ -54,6 +63,7 @@ class Ref:
             raise Exception('invalid arguments {}'.format(args))
 
     def __eq__(self, other):
+        if not isinstance(other, Ref): return False
         return (self.object_number, self.generation_number) == (other.object_number, other.generation_number)
 
     def __hash__(self):
