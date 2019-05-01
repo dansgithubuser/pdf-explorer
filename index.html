@@ -74,8 +74,13 @@ function prepare(obj, parent, indent = 0, prefix = '') {
     result += '\t'.repeat(indent) + ']';
   } else if (obj.constructor == Object) {
     result += '<<\n';
-    for (const k in obj)
+    for (const k in obj) {
+      if (k == 'pdf_py_meta') {
+        result = 'stream ' + result;
+        continue;
+      }
       result += prepare(obj[k], parent, indent + 1, `${k} `) + '\n';
+    }
     result += '\t'.repeat(indent) + '>>';
   } else {
     result += `${obj}`;

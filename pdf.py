@@ -36,6 +36,11 @@ class Stream:
     def __repr__(self):
         return 'Stream({} {})'.format(pprint.pformat(self.dictionary), hash(self.stream))
 
+    def to_json(self):
+        uniquifier = 'pdf_py_meta'
+        assert uniquifier not in self.dictionary
+        return dict(self.dictionary, **{uniquifier: 'stream'})
+
 class Ref:
     def __init__(self, *args):
         types = [type(i) for i in args]
