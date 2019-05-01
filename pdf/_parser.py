@@ -3,6 +3,87 @@ import re
 
 from ._objects import Name, Ref, Stream
 
+def transform_number(x):
+    try: return int(x)
+    except Exception: pass
+    return float(x)
+
+not_raw_paren = (
+    r'(?:'
+        r'[^\\()]|\\.'
+    r')*'
+)
+
+pattern_string_literal = (
+    r'\(('
+        + not_raw_paren +
+        r'(?:'  # allow balanced raw parens
+            r'\('
+            + not_raw_paren +
+            '\)'
+        r')*'
+        + not_raw_paren +
+    r')\)'
+)
+
+def transform_string_literal(x):
+    if x[0:2] == b'\xfe\xff':
+        x = x.decode('utf-16')
+    else:
+        try: x = x.decode()
+        except: return x
+    for k, v in {
+        r'\n': '\n',
+        r'\r': '\r',
+        r'\t': '\t',
+        r'\b': '\b',
+        r'\f': '\f',
+        r'\(': '(',
+        r'\)': ')',
+        r'\\': '\\',
+    }.items(): x = x.replace(k, v)
+    r = re.compile(r'\\([0-8]{1,3})')
+    x = r.sub(lambda m: chr(int(m.group(1), 8)), x)
+    return x
+
+def transform_string_hexadecimal(x):
+    result = ''
+    for i in range(0, len(x), 2):
+        o = int(x[i], 16) * 16
+        if i + 1 < len(x): o += int(x[i + 1], 16)
+        result += chr(o)
+    return result
+
+name_sentinel = '(?=' + '|'.join([
+    r'\s',
+    # according to ISO, seems name end should be indicated by space, but in practice we see other shenanigans
+    '/',
+    r'\(',
+    r'\[', r'\]',
+    '<', '>',
+]) + ')'
+
+pattern_name = '/(.*?)' + name_sentinel
+
+def transform_array(x, parser, _depth):
+    result = []
+    while not parser.parse(']', allow_nonmatch=True, _depth=_depth):
+        result.append(parser.parse_object(_depth=_depth + 1))
+    return result
+
+def transform_dictionary_or_stream(x, parser, _depth):
+    result = {}
+    while not parser.parse('>>', allow_nonmatch=True, _depth=_depth):
+        entry = Name(parser.parse(pattern_name, _depth=_depth)[0])
+        result[entry.value] = parser.parse_object(_depth=_depth + 1)
+    if parser.parse('stream', allow_nonmatch=True, skip_space=False, _depth=_depth):
+        l = result['Length']
+        e = parser.content.find(b'endstream', parser.i + l) - 1
+        result = Stream(result, parser.content[e - l:e])
+        parser._advance(e)
+        parser.parse(r'\s*endstream', _depth=_depth)
+    return result
+
 class Parser:
     def __init__(self, content):
         self.line = 1
@@ -39,85 +120,13 @@ class Parser:
         return result
 
     def parse_object(self, _depth=0):
-        def transform_number(x):
-            try: return int(x)
-            except Exception: pass
-            return float(x)
-        not_raw_paren = (
-            r'(?:'
-                r'[^\\()]|\\.'
-            r')*'
-        )
-        pattern_string_literal = (
-            r'\(('
-                + not_raw_paren +
-                r'(?:'  # allow balanced raw parens
-                    r'\('
-                    + not_raw_paren +
-                    '\)'
-                r')*'
-                + not_raw_paren +
-            r')\)'
-        )
-        def transform_string_literal(x):
-            if x[0:2] == b'\xfe\xff':
-                x = x.decode('utf-16')
-            else:
-                try: x = x.decode()
-                except: return x
-            for k, v in {
-                r'\n': '\n',
-                r'\r': '\r',
-                r'\t': '\t',
-                r'\b': '\b',
-                r'\f': '\f',
-                r'\(': '(',
-                r'\)': ')',
-                r'\\': '\\',
-            }.items(): x = x.replace(k, v)
-            r = re.compile(r'\\([0-8]{1,3})')
-            x = r.sub(lambda m: chr(int(m.group(1), 8)), x)
-            return x
-        def transform_string_hexadecimal(x):
-            result = ''
-            for i in range(0, len(x), 2):
-                o = int(x[i], 16) * 16
-                if i + 1 < len(x): o += int(x[i + 1], 16)
-                result += chr(o)
-            return result
-        name_sentinel = '(?=' + '|'.join([
-            r'\s',
-            # according to ISO, seems name end should be indicated by space, but in practice we see other shenanigans
-            '/',
-            r'\(',
-            r'\[', r'\]',
-            '<', '>',
-        ]) + ')'
-        pattern_name = '/(.*?)' + name_sentinel
-        def transform_array(x):
-            result = []
-            while not self.parse(']', allow_nonmatch=True, _depth=_depth):
-                result.append(self.parse_object(_depth=_depth + 1))
-            return result
-        def transform_dictionary_or_stream(x):
-            result = {}
-            while not self.parse('>>', allow_nonmatch=True, _depth=_depth):
-                entry = Name(self.parse(pattern_name, _depth=_depth)[0])
-                result[entry.value] = self.parse_object(_depth=_depth + 1)
-            if self.parse('stream', allow_nonmatch=True, skip_space=False, _depth=_depth):
-                l = result['Length']
-                e = self.content.find(b'endstream', self.i + l) - 1
-                result = Stream(result, self.content[e - l:e])
-                self._advance(e)
-                self.parse(r'\s*endstream', _depth=_depth)
-            return result
         for pattern, transform, kwargs in [
             (pattern_name, lambda x: Name(x[0]), {}),
             ('\d+ \d+ R', Ref, {}),
             (r'[+-]?\d?\.?\d*', transform_number, {}),
             (pattern_string_literal, lambda x: transform_string_literal(x[0]), {'binary': True}),
-            (r'<<', transform_dictionary_or_stream, {}),
-            (r'\[', transform_array, {}),
+            (r'<<', lambda x: transform_dictionary_or_stream(x, self, _depth), {}),
+            (r'\[', lambda x: transform_array(x, self, _depth), {}),
             ('<(.*?)>', lambda x: transform_string_hexadecimal(x[0]), {}),
             ('true', lambda x: True, {}),
             ('false', lambda x: False, {}),
