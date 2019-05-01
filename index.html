@@ -63,25 +63,65 @@ function isRef(obj) {
   return true;
 }
 
+function shouldPutOnSingleLine(obj, depth = 0) {
+  if (depth >= 3) return false;
+  if (obj.constructor == String) {
+    if (isRef(obj)) return false;
+    if (obj.length > 80) return false;
+  }
+  else if (obj.constructor == Array) {
+    if (obj.length > 8) return false;
+    for (const i of obj)
+      if (!shouldPutOnSingleLine(i, depth + 1))
+        return false;
+  } else if (obj.constructor == Object) {
+    if (Object.keys(obj).length > 1) return false;
+    for (const k in obj)
+      if (!shouldPutOnSingleLine(obj[k], depth + 1))
+        return false;
+  }
+  return true;
+}
+
+function prepareCollection(obj, parent, indent, start, end, prepareElement) {
+  var result = '';
+  const singleLine = shouldPutOnSingleLine(obj);
+  result += start;
+  if (!singleLine)
+    result += '\n';
+  keys = obj;
+  if (obj.constructor == Array) keys = Array.from({ length: obj.length }, (v, i) => i);
+  for (const k in keys) {
+    if (k == 'pdf_py_meta') {
+      result = 'stream ' + result;
+      continue;
+    }
+    if (singleLine) {
+      result += prepareElement(obj[k], parent, 0, k);
+      result += ' ';
+    } else {
+      result += prepareElement(obj[k], parent, indent + 1, k);
+      result += '\n';
+    }
+  }
+  if (!singleLine)
+    result += '\t'.repeat(indent);
+  result += end;
+  return result;
+}
+
 function prepare(obj, parent, indent = 0, prefix = '') {
   var result = '\t'.repeat(indent) + prefix;
   if (obj.constructor == String && isRef(obj)) {
     result += `<span class="ref" onclick="dive('${parent}', '${obj}')">${obj}</span>`;
   } else if (obj.constructor == Array) {
-    result += '[\n';
-    for (const i of obj)
-      result += prepare(i, parent, indent + 1) + ',\n';
-    result += '\t'.repeat(indent) + ']';
+    result += prepareCollection(obj, parent, indent, '[', ']', (obj, parent, indent) => {
+      return prepare(obj, parent, indent) + ',';
+    });
   } else if (obj.constructor == Object) {
-    result += '<<\n';
-    for (const k in obj) {
-      if (k == 'pdf_py_meta') {
-        result = 'stream ' + result;
-        continue;
-      }
-      result += prepare(obj[k], parent, indent + 1, `${k} `) + '\n';
-    }
-    result += '\t'.repeat(indent) + '>>';
+    result += prepareCollection(obj, parent, indent, '<<', '>>', (obj, parent, indent, key) => {
+      return prepare(obj, parent, indent, `${key} `);
+    });
   } else {
     result += `${obj}`;
   }
