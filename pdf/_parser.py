@@ -130,6 +130,7 @@ class Parser:
             ('<(.*?)>', lambda x: transform_string_hexadecimal(x[0]), {}),
             ('true', lambda x: True, {}),
             ('false', lambda x: False, {}),
+            ('null', lambda x: None, {}),
         ]:
             obj = self.parse(pattern, allow_nonmatch=True, **kwargs, _depth=_depth)
             if obj is not None: return transform(obj)

@@ -44,6 +44,9 @@ def transform_array(x):
 def transform_bool(x):
     return {True: 'true', False: 'false'}[x]
 
+def transform_null(x):
+    return 'null'
+
 def to_bytes(object):
     result = {
         Name: transform_typical,
@@ -55,6 +58,7 @@ def to_bytes(object):
         Stream: transform_stream,
         list: transform_array,
         bool: transform_bool,
+        None: transform_null,
     }[object.__class__](object)
     if type(result) == str: result = result.encode('utf-8')
     return result
