@@ -123,7 +123,7 @@ class Parser:
         for pattern, transform, kwargs in [
             (pattern_name, lambda x: Name(x[0]), {}),
             ('\d+ \d+ R', Ref, {}),
-            (r'[+-]?\d?\.?\d*', transform_number, {}),
+            (r'[+-]?(?:\d*)?\.?\d*', transform_number, {}),
             (pattern_string_literal, lambda x: transform_string_literal(x[0]), {'binary': True}),
             (r'<<', lambda x: transform_dictionary_or_stream(x, self, _depth), {}),
             (r'\[', lambda x: transform_array(x, self, _depth), {}),
