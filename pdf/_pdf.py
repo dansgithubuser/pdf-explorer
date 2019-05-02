@@ -113,8 +113,8 @@ class Pdf:
     def load(self, file_name):
         with open(file_name, 'rb') as f: parser = Parser(f.read())
         # header
-        self.header = parser.parse(r'%([^\n\r]*)')
-        x = parser.parse(r'%([^\n\r]*)', allow_nonmatch=True, binary=True)
+        self.header = parser.parse(r'%([^\n\r]*)', skip_comment=False)
+        x = parser.parse(r'%([^\n\r]*)', allow_nonmatch=True, binary=True, skip_comment=False)
         if x: self.header.append(x[0])
         while parser.i < len(parser.content):
             # body

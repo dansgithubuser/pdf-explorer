@@ -100,7 +100,10 @@ class Parser:
         m = re.match(pattern.encode(), self.content[self.i:])
         return m
 
-    def parse(self, pattern, allow_nonmatch=False, skip_space=True, binary=False, _depth=0):
+    def skip(self, pattern=r'\s*', _depth=0):
+        self.parse(pattern, allow_nonmatch=True, skip_space=False, skip_comment=False, _depth=_depth)
+
+    def parse(self, pattern, allow_nonmatch=False, skip_space=True, binary=False, skip_comment=True, _depth=0):
         m = self.check(pattern)
         if not m or not len(m.group()):
             if allow_nonmatch: return
@@ -108,7 +111,12 @@ class Parser:
                 self.line, self.i, repr(pattern), repr(self.check('(.*?)(\n|\r|$)').group(1))
             ))
         self._advance(self.i + len(m.group()), _depth=_depth)
-        if skip_space: self.parse('\s*', allow_nonmatch=True, skip_space=False, _depth=_depth)
+        if skip_comment:
+            self.skip(_depth=_depth)
+            if not self.check('%%EOF'):
+                self.skip('%[^\r\n]*', _depth=_depth)
+        if skip_space:
+            self.skip(_depth=_depth)
         if binary:
             decode = lambda x: x
         else:
