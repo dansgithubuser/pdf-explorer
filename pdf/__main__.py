@@ -8,6 +8,7 @@ from pdf import Pdf
 parser = argparse.ArgumentParser()
 parser.add_argument('pdf')
 parser.add_argument('--compare', '-c')
+parser.add_argument('--save', '-s')
 args = parser.parse_args()
 
 pdf = Pdf().load(args.pdf)
@@ -28,3 +29,5 @@ if args.compare:
     for k in other.objects.keys():
         if k not in pdf.objects:
             print('===== {} ===== missing'.format(k))
+if args.save:
+    pdf.save(args.save)
