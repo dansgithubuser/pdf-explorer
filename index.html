@@ -155,8 +155,13 @@ async function load() {
   gPdf = await api('store', 'Pdf');
   await apiPdf('load', { op: 'eval', args: [v('file')] });
   const rootRef = await apiPdf('root');
-  const root = await apiPdfObj(rootRef);
-  gObjs = [new Obj(rootRef, root)];
+  showObject(rootRef);
+}
+
+async function showObject(ref) {
+  if (!ref) ref = v('object');
+  const obj = await apiPdfObj(ref);
+  gObjs = [new Obj(ref, obj)];
   render();
 }
 
@@ -165,10 +170,15 @@ window.onload = () => {
     if (event.keyCode === 13) load();
   });
   e('load').addEventListener('click', load);
+  e('object').addEventListener('keyup', function(event) {
+    if (event.keyCode === 13) showObject();
+  });
+  e('show-object').addEventListener('click', () => showObject());
 };
 
 </script>
 
 file: <input type='text' id='file' size=40> <input type='button' id='load' value='load'><br>
+object: <input type='text' id='object'> <input type='button' id='show-object' value='show'><br>
 <br>
 <div id='view'></div>

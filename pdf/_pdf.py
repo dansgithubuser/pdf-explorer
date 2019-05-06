@@ -124,7 +124,8 @@ class Pdf:
                 parser.parse('endobj')
             # XFA
             if parser.check('startxref'):
-                raise Exception("sorry, this isn't actually a PDF, it looks to be XFA")
+                print ("sorry, this isn't actually a PDF, it looks to be XFA")
+                return self
             # cross-reference table
             parser.parse('xref')
             while not parser.check('trailer'):
@@ -182,7 +183,11 @@ class Pdf:
             file.write(b'%%EOF\n')
 
     def root(self):
-        return self.trailer[-1].dictionary['Root']
+        if self.trailer:
+            return self.trailer[-1].dictionary['Root']
+        for k, v in self.objects.items():
+            if type(v) == dict and v.get('Type') == Name('Catalog'):
+                return k
 
     def object(self, *args):
         return self.objects[Ref(*args)]
