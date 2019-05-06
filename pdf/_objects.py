@@ -22,9 +22,12 @@ class Stream:
         self.dictionary = dictionary
         self.stream = stream
         self.decoded = None
-        if self.dictionary.get('Filter') == Name('FlateDecode'):
-            try: self.decoded = zlib.decompress(self.stream).decode('utf-8')
-            except Exception as e: self.decoded = repr(e)
+        if not self.dictionary.get('Filter'):
+            self.decoded = self.stream
+        elif self.dictionary['Filter'] == Name('FlateDecode'):
+            self.decoded = zlib.decompress(self.stream)
+            try: self.decoded.decode('utf-8')
+            except: pass
 
     def __eq__(self, other):
         if not isinstance(other, Stream): return False
@@ -33,12 +36,18 @@ class Stream:
     def __repr__(self):
         return 'Stream({} {})'.format(pprint.pformat(self.dictionary), self.decoded or hash(self.stream))
 
+    def __getitem__(self, key):
+        return self.dictionary[key]
+
     def to_json(self):
         uniquifier = 'pdf_py_meta'
         assert uniquifier not in self.dictionary
         return dict(self.dictionary, **{
             uniquifier: {'type': 'stream', 'decoded': self.decoded},
         })
+
+    def get(self, key):
+        return self.dictionary.get(key)
 
 class Ref:
     def __init__(self, *args):

@@ -122,25 +122,61 @@ class Pdf:
                 ref = Ref(parser.parse(r'\d+ \d+ obj'))
                 self.objects[ref] = parser.parse_object()
                 parser.parse('endobj')
-            # XFA
-            if parser.check('startxref'):
-                print ("sorry, this isn't actually a PDF, it looks to be XFA")
-                return self
-            # cross-reference table
-            parser.parse('xref')
-            while not parser.check('trailer'):
-                object_number_i, objects = [int(i) for i in parser.parse(r'[^\n\r]*').split()]
-                for i in range(objects):
-                    offset, generation_number, keyword = parser.parse('(\d+) (\d+) ([fn])')
-                    if object_number_i + i == 0: continue
-                    self.xref[object_number_i + i] = Xref(int(offset), int(generation_number), keyword)
-            # trailer
-            parser.parse('trailer')
-            dictionary = parser.parse_object()
-            parser.parse('startxref')
-            startxref = int(parser.parse('\d+'))
-            self.trailer.append(Trailer(dictionary, startxref))
-            parser.parse(r'%%EOF\s*')
+            # cross-reference
+            if parser.parse('startxref', allow_nonmatch=True):
+                # stream
+                startxref = int(parser.parse(r'\d+'))
+                for k, v in self.objects.items():
+                    if isinstance(v, Stream) and v.get('Type') == Name('XRef'):
+                        xref = v
+                        break
+                i = 0
+                object_number = 0
+                while i < len(xref.decoded):
+                    x = []
+                    for j, v in enumerate(xref['W']):
+                        if v == 0:
+                            x.append([
+                                1,
+                                None,
+                                0 if x and x[0] == 1 else None
+                            ][j])
+                        else:
+                            x.append(int.from_bytes(xref.decoded[i:i+v], 'big'))
+                            i += v
+                    if x[0] == 0:
+                        if object_number != 0:
+                            self.xref[object_number] = Xref(x[1], x[2], 'f')
+                    elif x[0] == 1:
+                        self.xref[object_number] = Xref(x[1], x[2], 'n')
+                    elif x[0] == 2:
+                        raise Exception('unimplemented')
+                    object_number += 1
+                self.trailer.append(Trailer(
+                    {
+                        k: v
+                        for k, v in xref.dictionary.items()
+                        if k not in ['Type', 'Filter', 'DecodeParams', 'Length', 'W']
+                    },
+                    startxref,
+                ))
+            else:
+                # table
+                parser.parse('xref')
+                while not parser.check('trailer'):
+                    object_number_i, objects = [int(i) for i in parser.parse(r'[^\n\r]*').split()]
+                    for i in range(objects):
+                        offset, generation_number, keyword = parser.parse('(\d+) (\d+) ([fn])')
+                        if object_number_i + i == 0: continue
+                        self.xref[object_number_i + i] = Xref(int(offset), int(generation_number), keyword)
+                # trailer
+                parser.parse('trailer')
+                dictionary = parser.parse_object()
+                parser.parse('startxref')
+                startxref = int(parser.parse('\d+'))
+                self.trailer.append(Trailer(dictionary, startxref))
+            # end of file
+            parser.parse('%%EOF\s*')
         # return so we can use something like named constructor idiom
         return self
 
