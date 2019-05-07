@@ -1,9 +1,16 @@
+'''
+This file makes page and section references to ISO 32000-1:2008.
+
+Overall file structure is documented in section 7.5.
+'''
+
 from ._parser import Parser
 from ._objects import Name, Ref, Stream
-from ._to_bytes import to_bytes
+from ._to_bytes import to_bytes, Custom
 
 import copy
 import pprint
+import re
 
 class Xref:
     def __init__(self, offset, generation_number, keyword):
@@ -169,3 +176,60 @@ class Pdf:
 
     def object(self, *args):
         return self.objects[Ref(*args)]
+
+    def descend(self, object, *keys):
+        def follow(x):
+            if x == 'root':
+                x = self.root()
+            if x.__class__ == Ref:
+                x = self.object(x)
+            return x
+        x = follow(object)
+        for i in keys:
+            if x.__class__ not in [dict, Stream] or i not in x: return
+            x = follow(x[i])
+        return x
+
+    def templatify_form(self, form, value):
+        fonts = self.descend('root', 'AcroForm', 'DR', 'Font')
+        da = self.descend('root', 'AcroForm', 'DA')
+        if da:
+            font_name = re.search('/(.*?) .*?Tf', da).group(1)
+            font = fonts[font_name]
+        else:
+            font = next(iter(fonts.values()))
+        if 'Kids' in form:
+            for kid in form['Kids']:
+                self.templatify_form(self.descend(kid), value)
+            return
+        if 'DV' in form:
+            del form['DV']
+        form['V'] = Custom(value, padding=80)
+        if 'AP' in form:
+            for k, v in self.descend(form, 'AP').items():  # p80 (7.7.4)
+                v = self.descend(v)
+                if v.__class__ == Stream:
+                    if 'Filter' in v:
+                        del v['Filter']
+                    v['Resources'] = {
+                        'Font': {
+                            'Font': font,
+                        }
+                    }
+                    v.stream = (
+                        '/Tx BMC\n'  # p435
+                        'q\n'
+                        'BT\n'
+                        '/Font 11.00016 Tf\n'  # p244
+                        '1 0 0 1 2.00 3.88 Tm\n'  # p250
+                        '({}) Tj\n'  # p81 (7.8.2), p251 (9.4.3)
+                        'ET\n'
+                        'Q\n'
+                        'EMC\n'
+                    ).format(value).encode('utf-8')
+                    v['Length'] = len(v.stream)
+
+    def templatify_forms(self):
+        for k, v in self.objects.items():
+            if self.descend(v, 'FT') == Name('Tx'): #  p430 (12.7)
+                self.templatify_form(v, '{{{}}}'.format(k.object_number))

@@ -1,3 +1,7 @@
+'''
+Objects are documented in section 7.3 of ISO 32000-1:2008.
+'''
+
 import os
 import re
 

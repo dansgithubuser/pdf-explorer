@@ -1,7 +1,16 @@
+'''
+Objects are documented in section 7.3 of ISO 32000-1:2008.
+'''
+
 from ._objects import Name, Ref, Stream
 
 import re
 import string
+
+class Custom:
+    def __init__(self, object, padding=0):
+        self.object = object
+        self.padding = padding
 
 def transform_typical(x):
     return repr(x)
@@ -44,6 +53,9 @@ def transform_bool(x):
 def transform_null(x):
     return 'null'
 
+def transform_custom(x):
+    return to_bytes(x.object) + b' ' * x.padding
+
 def to_bytes(object):
     result = {
         Name: transform_typical,
@@ -56,6 +68,7 @@ def to_bytes(object):
         list: transform_array,
         bool: transform_bool,
         None: transform_null,
+        Custom: transform_custom,
     }[object.__class__](object)
     if type(result) == str: result = result.encode('utf-8')
     return result

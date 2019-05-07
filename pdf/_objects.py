@@ -1,3 +1,9 @@
+'''
+This file makes page and section references to ISO 32000-1:2008.
+
+Objects are documented in section 7.3 of ISO 32000-1:2008.
+'''
+
 import re
 import pprint
 import zlib
@@ -24,7 +30,7 @@ class Stream:
         self.decoded = None
         if not self.dictionary.get('Filter'):
             self.decoded = self.stream
-        elif self.dictionary['Filter'] == Name('FlateDecode'):
+        elif self.dictionary['Filter'] == Name('FlateDecode'):  # p22 (7.4), p25 (7.4.4)
             self.decoded = zlib.decompress(self.stream)
             try: self.decoded.decode('utf-8')
             except: pass
@@ -38,6 +44,15 @@ class Stream:
 
     def __getitem__(self, key):
         return self.dictionary[key]
+
+    def __setitem__(self, key, value):
+        self.dictionary[key] = value
+
+    def __delitem__(self, key):
+        del self.dictionary[key]
+
+    def __contains__(self, item):
+        return item in self.dictionary
 
     def to_json(self):
         uniquifier = 'pdf_py_meta'
@@ -56,6 +71,8 @@ class Ref:
             self.object_number, self.generation_number = [int(i) for i in args[0].split()[:2]]
         elif types == [int]:
             self.object_number, self.generation_number = args[0], 0
+        elif types == [Ref]:
+            self.object_number, self.generation_number = args[0].object_number, args[0].generation_number
         elif types == [int, int]:
             self.object_number, self.generation_number = args
         else:
