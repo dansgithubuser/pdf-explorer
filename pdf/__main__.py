@@ -9,6 +9,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('pdf')
 parser.add_argument('--compare', '-c')
 parser.add_argument('--templatify-forms', '-t', action='store_true')
+parser.add_argument('--templatify-forms-whitelist', '--tfw', default='')
 parser.add_argument('--save', '-s')
 args = parser.parse_args()
 
@@ -31,6 +32,6 @@ if args.compare:
         if k not in pdf.objects:
             print('===== {} ===== missing'.format(k))
 if args.templatify_forms:
-    pdf.templatify_forms()
+    pdf.templatify_forms([int(i) for i in args.templatify_forms_whitelist.split()])
 if args.save:
     pdf.save(args.save)

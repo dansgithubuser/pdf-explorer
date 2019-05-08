@@ -190,7 +190,7 @@ class Pdf:
             x = follow(x[i])
         return x
 
-    def templatify_form(self, form, value):
+    def templatify_text(self, form, value, whitelist=None):
         fonts = self.descend('root', 'AcroForm', 'DR', 'Font')
         da = self.descend('root', 'AcroForm', 'DA')
         if da:
@@ -200,7 +200,8 @@ class Pdf:
             font = next(iter(fonts.values()))
         if 'Kids' in form:
             for kid in form['Kids']:
-                self.templatify_form(self.descend(kid), value)
+                if not self._white(kid, whitelist): continue
+                self.templatify_text(self.descend(kid), '{{{}}}t'.format(kid.object_number), whitelist)
             return
         if 'DV' in form:
             del form['DV']
@@ -229,7 +230,24 @@ class Pdf:
                     ).format(value).encode('utf-8')
                     v['Length'] = len(v.stream)
 
-    def templatify_forms(self):
+    def templatify_button(self, form, value):
+        form['AS'] = Custom(Name(value), padding=80)
+        form['V'] = Custom(Name(value), padding=80)
+
+    def templatify_forms(self, whitelist=None):
         for k, v in self.objects.items():
-            if self.descend(v, 'FT') == Name('Tx'): #  p430 (12.7)
-                self.templatify_form(v, '{{{}}}'.format(k.object_number))
+            ft = self.descend(v, 'FT')
+            if ft.__class__ != Name: continue
+            if not self._white(k, whitelist): continue
+            ft = ft.value
+            value = '{{{}}}'.format(k.object_number)
+            if ft == 'Tx': #  p430 (12.7)
+                self.templatify_text(v, value+'t', whitelist)
+            elif ft == 'Btn':
+                self.templatify_button(v, value+'b')
+
+    def _white(self, ref, whitelist):
+        if not whitelist: return True
+        if self.descend(self.object(ref), 'Kids'): return True
+        if ref.object_number in whitelist: return True
+        return False
