@@ -196,14 +196,8 @@ class Pdf:
         return x
 
     def templatify_text(self, ref, whitelist=None):
+        if self._templatify_kids(ref, Pdf.templatify_text, whitelist): return
         form = self.object(ref)
-        # handle kids
-        if 'Kids' in form:
-            for kid in form['Kids']:
-                if not self._white(kid, whitelist): continue
-                self.templatify_text(kid, whitelist)
-            return
-        # mutations
         value = self._template_value('t', ref)
         if 'DV' in form:
             del form['DV']
@@ -241,7 +235,8 @@ class Pdf:
                     ).format(value).encode('utf-8')
                     v['Length'] = len(v.stream)
 
-    def templatify_button(self, ref):
+    def templatify_button(self, ref, whitelist=None):
+        if self._templatify_kids(ref, Pdf.templatify_button, whitelist): return
         form = self.object(ref)
         value = self._template_value('b', ref)
         form['AS'] = Custom(Name(value), padding=80)
@@ -254,12 +249,21 @@ class Pdf:
             if ft == 'Tx': #  p430 (12.7)
                 self.templatify_text(k, whitelist)
             elif ft == 'Btn':
-                self.templatify_button(k)
+                self.templatify_button(k, whitelist)
+
+    def _templatify_kids(self, ref, templatify, whitelist):
+        form = self.object(ref)
+        if 'Kids' in form:
+            for kid in form['Kids']:
+                if not self._white(kid, whitelist): continue
+                templatify(self, kid, whitelist)
+            return True
+        return False
 
     def _white(self, ref, whitelist):
         if not whitelist:
             return True
-        if self.descend(ref, 'FT', extract=Name) == 'Tx' and self.descend(ref, 'Kids'):
+        if self.descend(ref, 'Kids'):
             return True
         if ref.object_number in whitelist:
             return True
