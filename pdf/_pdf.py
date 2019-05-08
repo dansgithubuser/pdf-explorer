@@ -177,7 +177,7 @@ class Pdf:
     def object(self, *args):
         return self.objects[Ref(*args)]
 
-    def descend(self, object, *keys):
+    def descend(self, object, *keys, extract=None):
         def follow(x):
             if x == 'root':
                 x = self.root()
@@ -188,6 +188,9 @@ class Pdf:
         for i in keys:
             if x.__class__ not in [dict, Stream] or i not in x: return
             x = follow(x[i])
+        if extract == Name:
+            if x.__class__ != Name: return
+            x = x.value
         return x
 
     def templatify_text(self, form, value, whitelist=None):
@@ -236,10 +239,8 @@ class Pdf:
 
     def templatify_forms(self, whitelist=None):
         for k, v in self.objects.items():
-            ft = self.descend(v, 'FT')
-            if ft.__class__ != Name: continue
             if not self._white(k, whitelist): continue
-            ft = ft.value
+            ft = self.descend(v, 'FT', extract=Name)
             value = '{{{}}}'.format(k.object_number)
             if ft == 'Tx': #  p430 (12.7)
                 self.templatify_text(v, value+'t', whitelist)
@@ -247,7 +248,10 @@ class Pdf:
                 self.templatify_button(v, value+'b')
 
     def _white(self, ref, whitelist):
-        if not whitelist: return True
-        if self.descend(self.object(ref), 'Kids'): return True
-        if ref.object_number in whitelist: return True
+        if not whitelist:
+            return True
+        if self.descend(ref, 'FT', extract=Name) == 'Tx' and self.descend(ref, 'Kids'):
+            return True
+        if ref.object_number in whitelist:
+            return True
         return False
