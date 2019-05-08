@@ -11,6 +11,7 @@ from ._to_bytes import to_bytes, Custom
 import copy
 import pprint
 import re
+import uuid
 
 class Xref:
     def __init__(self, offset, generation_number, keyword):
@@ -40,6 +41,7 @@ class Pdf:
         self.objects = {}
         self.xref = {}
         self.trailer = []
+        self.uniquifier = uuid.uuid4()
 
     def __repr__(self):
         return (
@@ -193,23 +195,29 @@ class Pdf:
             x = x.value
         return x
 
-    def templatify_text(self, form, value, whitelist=None):
-        fonts = self.descend('root', 'AcroForm', 'DR', 'Font')
-        da = self.descend('root', 'AcroForm', 'DA')
-        if da:
-            font_name = re.search('/(.*?) .*?Tf', da).group(1)
-            font = fonts[font_name]
-        else:
-            font = next(iter(fonts.values()))
+    def templatify_text(self, ref, whitelist=None):
+        form = self.object(ref)
+        # handle kids
         if 'Kids' in form:
             for kid in form['Kids']:
                 if not self._white(kid, whitelist): continue
-                self.templatify_text(self.descend(kid), '{{{}}}t'.format(kid.object_number), whitelist)
+                self.templatify_text(kid, whitelist)
             return
+        # mutations
+        value = self._template_value('t', ref)
         if 'DV' in form:
             del form['DV']
         form['V'] = Custom(value, padding=80)
         if 'AP' in form:
+            # font
+            fonts = self.descend('root', 'AcroForm', 'DR', 'Font')
+            da = self.descend('root', 'AcroForm', 'DA')
+            if da:
+                font_name = re.search('/(.*?) .*?Tf', da).group(1)
+                font = fonts[font_name]
+            else:
+                font = next(iter(fonts.values()))
+            # handle appearance
             for k, v in self.descend(form, 'AP').items():  # p80 (7.7.4)
                 v = self.descend(v)
                 if v.__class__ == Stream:
@@ -233,7 +241,9 @@ class Pdf:
                     ).format(value).encode('utf-8')
                     v['Length'] = len(v.stream)
 
-    def templatify_button(self, form, value):
+    def templatify_button(self, ref):
+        form = self.object(ref)
+        value = self._template_value('b', ref)
         form['AS'] = Custom(Name(value), padding=80)
         form['V'] = Custom(Name(value), padding=80)
 
@@ -241,11 +251,10 @@ class Pdf:
         for k, v in self.objects.items():
             if not self._white(k, whitelist): continue
             ft = self.descend(v, 'FT', extract=Name)
-            value = '{{{}}}'.format(k.object_number)
             if ft == 'Tx': #  p430 (12.7)
-                self.templatify_text(v, value+'t', whitelist)
+                self.templatify_text(k, whitelist)
             elif ft == 'Btn':
-                self.templatify_button(v, value+'b')
+                self.templatify_button(k)
 
     def _white(self, ref, whitelist):
         if not whitelist:
@@ -255,3 +264,6 @@ class Pdf:
         if ref.object_number in whitelist:
             return True
         return False
+
+    def _template_value(self, prefix, ref):
+        return '{}{}-{}'.format(prefix, ref.object_number, self.uniquifier)
