@@ -11,6 +11,8 @@ parser.add_argument('--compare', '-c')
 parser.add_argument('--templatify-forms', '-t', action='store_true')
 parser.add_argument('--templatify-forms-whitelist', '--tfw', default='')
 parser.add_argument('--templatify-forms-uniquifier', '--tfu')
+parser.add_argument('--templatify-forms-padding', '--tfp', type=int, default=80)
+parser.add_argument('--templatify-forms-custom-padding', '--tfcp', default='{}')
 parser.add_argument('--save', '-s')
 args = parser.parse_args()
 
@@ -35,6 +37,8 @@ if args.compare:
 if args.templatify_forms:
     if args.templatify_forms_uniquifier:
         pdf.uniquifier = args.templatify_forms_uniquifier
+    pdf.templatify_forms_padding = args.templatify_forms_padding
+    pdf.templatify_forms_custom_padding = eval(args.templatify_forms_custom_padding)
     pdf.templatify_forms([int(i) for i in args.templatify_forms_whitelist.split()])
 if args.save:
     pdf.save(args.save)

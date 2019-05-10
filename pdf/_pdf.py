@@ -42,6 +42,8 @@ class Pdf:
         self.xref = {}
         self.trailer = []
         self.uniquifier = uuid.uuid4()
+        self.templatify_forms_padding = 80
+        self.templatify_forms_custom_padding = {}
 
     def __repr__(self):
         return (
@@ -209,21 +211,21 @@ class Pdf:
         value = self._template_value('t', ref)
         if 'DV' in form:
             del form['DV']
-        form['V'] = Custom(value, padding=80)
-        self._templatify_appearance(form, value)
+        form['V'] = Custom(value, padding=self._templatify_padding(ref))
+        self._templatify_appearance(ref, value)
 
     def templatify_button(self, ref, whitelist=None):
         if self._templatify_kids(ref, Pdf.templatify_button, whitelist): return
         form = self.object(ref)
         value = self._template_value('b', ref)
-        form['AS'] = Custom(Name(value), padding=80)
-        form['V'] = Custom(Name(value), padding=80)
+        form['AS'] = Custom(Name(value), padding=self._templatify_padding(ref))
+        form['V'] = Custom(Name(value), padding=self._templatify_padding(ref))
 
     def templatify_choice(self, ref, whitelist=None):
         form = self.object(ref)
         value = self._template_value('c', ref)
-        form['V'] = Custom(value, padding=80)
-        self._templatify_appearance(form, value)
+        form['V'] = Custom(value, padding=self._templatify_padding(ref))
+        self._templatify_appearance(ref, value)
 
     def templatify_forms(self, whitelist=None):
         for k, v in self.objects.items():
@@ -257,7 +259,8 @@ class Pdf:
     def _template_value(self, prefix, ref):
         return '{}{}-{}'.format(prefix, ref.object_number, self.uniquifier)
 
-    def _templatify_appearance(self, form, value):
+    def _templatify_appearance(self, ref, value):
+        form = self.object(ref)
         if 'AP' not in form: return
         for k, v in self.descend(form, 'AP').items():  # p80 (7.7.4)
             v = self.descend(v)
@@ -275,9 +278,12 @@ class Pdf:
                 'BT\n'
                 '/Font 11.00016 Tf\n'  # p244
                 '1 0 0 1 2.00 3.88 Tm\n'  # p250
-                '({})' + ' '*80 + 'Tj\n'  # p81 (7.8.2), p251 (9.4.3)
+                '({})' + ' '*self._templatify_padding(ref) + 'Tj\n'  # p81 (7.8.2), p251 (9.4.3)
                 'ET\n'
                 'Q\n'
                 'EMC\n'
             ).format(value).encode('utf-8')
             v['Length'] = len(v.stream)
+
+    def _templatify_padding(self, ref):
+        return self.templatify_forms_custom_padding.get(ref.object_number, self.templatify_forms_padding)
