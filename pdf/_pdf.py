@@ -209,7 +209,7 @@ class Pdf:
         if self._templatify_kids(ref, Pdf.templatify_text, whitelist): return
         form = self.object(ref)
         value = self._template_value('t', ref)
-        if 'DV' in form:
+        if self.remove_dv and 'DV' in form:
             del form['DV']
         form['V'] = Custom(value, padding=self._templatify_padding(ref))
         self._templatify_appearance(ref, value)
@@ -227,7 +227,8 @@ class Pdf:
         form['V'] = Custom(value, padding=self._templatify_padding(ref))
         self._templatify_appearance(ref, value)
 
-    def templatify_forms(self, whitelist=None):
+    def templatify_forms(self, whitelist=None, remove_dv=False):
+        self.remove_dv = remove_dv
         for k, v in self.objects.items():
             if not self._white(k, whitelist): continue
             ft = self.descend(v, 'FT', extract=Name)
