@@ -265,9 +265,9 @@ class Pdf:
         if 'AP' not in form: return
         da = self.descend(form, 'DA')
         if da:
-            font_size = float(re.search('([^ ]+) Tf', da).group(1))
+            font, font_size = re.search('/([^ ]+) ([^ ]+) Tf', da).groups()
         else:
-            font_size = 0
+            font, font_size = 'none', '0'
         rect = self.descend(form, 'Rect')
         tm_f = rect[3] - rect[1]  # p88
         for k, v in self.descend(form, 'AP').items():  # p80 (7.7.4)
@@ -277,7 +277,7 @@ class Pdf:
                 del v['Filter']
             v['Resources'] = {
                 'Font': {
-                    self.descend(self.font, 'Name', extract=Name): self.font,
+                    font: self.font,
                 }
             }
             v.stream = (
@@ -286,7 +286,7 @@ class Pdf:
                 'BT\n'
                 f'{da}\n'
                 f'1 0 0 1 0 {tm_f} Tm\n'  # p250
-                f'0 {-font_size} Td\n'
+                f'0 -{font_size} Td\n'
                 '({})' + ' '*self._templatify_padding(ref) + 'Tj\n'  # p81 (7.8.2), p251 (9.4.3)
                 'ET\n'
                 'Q\n'
