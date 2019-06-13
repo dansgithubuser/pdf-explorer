@@ -262,6 +262,7 @@ class Pdf:
     def _templatify_appearance(self, ref, value):
         form = self.object(ref)
         if 'AP' not in form: return
+        da = self.descend(form, 'DA')
         for k, v in self.descend(form, 'AP').items():  # p80 (7.7.4)
             v = self.descend(v)
             if v.__class__ != Stream: continue
@@ -269,14 +270,14 @@ class Pdf:
                 del v['Filter']
             v['Resources'] = {
                 'Font': {
-                    'Font': self.font,
+                    self.descend(self.font, 'Name', extract=Name): self.font,
                 }
             }
             v.stream = (
                 '/Tx BMC\n'  # p435
                 'q\n'
                 'BT\n'
-                '/Font 11.00016 Tf\n'  # p244
+                f'{da}\n'
                 '1 0 0 1 2.00 3.88 Tm\n'  # p250
                 '({})' + ' '*self._templatify_padding(ref) + 'Tj\n'  # p81 (7.8.2), p251 (9.4.3)
                 'ET\n'
