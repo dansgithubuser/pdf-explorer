@@ -264,6 +264,12 @@ class Pdf:
         form = self.object(ref)
         if 'AP' not in form: return
         da = self.descend(form, 'DA')
+        if da:
+            font_size = float(re.search('([^ ]+) Tf', da).group(1))
+        else:
+            font_size = 0
+        rect = self.descend(form, 'Rect')
+        tm_f = rect[3] - rect[1]  # p88
         for k, v in self.descend(form, 'AP').items():  # p80 (7.7.4)
             v = self.descend(v)
             if v.__class__ != Stream: continue
@@ -279,7 +285,8 @@ class Pdf:
                 'q\n'
                 'BT\n'
                 f'{da}\n'
-                '1 0 0 1 2.00 3.88 Tm\n'  # p250
+                f'1 0 0 1 0 {tm_f} Tm\n'  # p250
+                f'0 {-font_size} Td\n'
                 '({})' + ' '*self._templatify_padding(ref) + 'Tj\n'  # p81 (7.8.2), p251 (9.4.3)
                 'ET\n'
                 'Q\n'
