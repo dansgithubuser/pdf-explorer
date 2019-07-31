@@ -205,22 +205,27 @@ class Pdf:
             x = x.value
         return x
 
-    def templatify_text(self, ref, whitelist=None):
-        if self._templatify_kids(ref, Pdf.templatify_text, whitelist): return
+    def templatify_text(self, ref, **kwargs):
+        whitelist = kwargs.get('whitelist')
+        da = kwargs.get('da')
+        da = self.descend(ref, 'DA') or da
+        if self._templatify_kids(ref, Pdf.templatify_text, whitelist, da): return
         form = self.object(ref)
         if self.remove_dv and 'DV' in form:
             del form['DV']
         form['V'] = Custom(self._template_value('t', ref), padding=self._templatify_padding(ref))
-        self._templatify_appearance(ref, self._template_value('g', ref))
+        self._templatify_appearance(ref, self._template_value('g', ref), da)
 
-    def templatify_button(self, ref, whitelist=None):
+    def templatify_button(self, ref, **kwargs):
+        whitelist = kwargs.get('whitelist')
         if self._templatify_kids(ref, Pdf.templatify_button, whitelist): return
         form = self.object(ref)
         value = self._template_value('b', ref)
         form['AS'] = Custom(Name(value), padding=self._templatify_padding(ref))
         form['V'] = Custom(Name(value), padding=self._templatify_padding(ref))
 
-    def templatify_choice(self, ref, whitelist=None):
+    def templatify_choice(self, ref, **kwargs):
+        whitelist = kwargs.get('whitelist')
         form = self.object(ref)
         value = self._template_value('c', ref)
         form['V'] = Custom(value, padding=self._templatify_padding(ref))
@@ -232,18 +237,18 @@ class Pdf:
             if not self._white(k, whitelist): continue
             ft = self.descend(v, 'FT', extract=Name)
             if ft == 'Tx': #  p430 (12.7)
-                self.templatify_text(k, whitelist)
+                self.templatify_text(k, whitelist=whitelist)
             elif ft == 'Btn':
-                self.templatify_button(k, whitelist)
+                self.templatify_button(k, whitelist=whitelist)
             elif ft == 'Ch':
-                self.templatify_choice(k, whitelist)
+                self.templatify_choice(k, whitelist=whitelist)
 
-    def _templatify_kids(self, ref, templatify, whitelist):
+    def _templatify_kids(self, ref, templatify, whitelist, da=None):
         form = self.object(ref)
         if 'Kids' in form:
             for kid in form['Kids']:
                 if not self._white(kid, whitelist): continue
-                templatify(self, kid, whitelist)
+                templatify(self, kid, whitelist=whitelist, da=da)
             return True
         return False
 
@@ -259,10 +264,10 @@ class Pdf:
     def _template_value(self, prefix, ref):
         return '{}{}-{}'.format(prefix, ref.object_number, self.uniquifier)
 
-    def _templatify_appearance(self, ref, value):
+    def _templatify_appearance(self, ref, value, da=None):
         form = self.object(ref)
         if 'AP' not in form: return
-        da = self.descend(form, 'DA')
+        da = self.descend(form, 'DA') or da
         if da:
             font, font_size = re.search('/([^ ]+) ([^ ]+) Tf', da).groups()
         else:
