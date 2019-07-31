@@ -208,11 +208,10 @@ class Pdf:
     def templatify_text(self, ref, whitelist=None):
         if self._templatify_kids(ref, Pdf.templatify_text, whitelist): return
         form = self.object(ref)
-        value = self._template_value('t', ref)
         if self.remove_dv and 'DV' in form:
             del form['DV']
-        form['V'] = Custom(value, padding=self._templatify_padding(ref))
-        self._templatify_appearance(ref, value)
+        form['V'] = Custom(self._template_value('t', ref), padding=self._templatify_padding(ref))
+        self._templatify_appearance(ref, self._template_value('g', ref))
 
     def templatify_button(self, ref, whitelist=None):
         if self._templatify_kids(ref, Pdf.templatify_button, whitelist): return
@@ -286,12 +285,13 @@ class Pdf:
                 'BT\n'
                 f'{da}\n'
                 f'1 0 0 1 0 {tm_f} Tm\n'  # p250
-                f'0 -{font_size} Td\n'
-                '({})' + ' '*self._templatify_padding(ref) + 'Tj\n'  # p81 (7.8.2), p251 (9.4.3)
+                f'{font_size} TL\n'
+                'T*\n'
+                f'({value})' + ' '*self._templatify_padding(ref) + 'Tj\n'  # p81 (7.8.2), p251 (9.4.3)
                 'ET\n'
                 'Q\n'
                 'EMC\n'
-            ).format(value).encode('utf-8')
+            ).encode('utf-8')
             v['Length'] = len(v.stream)
 
     def _templatify_padding(self, ref):
