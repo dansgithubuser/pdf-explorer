@@ -80,11 +80,11 @@ def transform_dictionary_or_stream(x, parser, _depth):
     while not parser.parse('>>', allow_nonmatch=True, _depth=_depth):
         entry = Name(parser.parse(pattern_name, _depth=_depth)[0])
         result[entry.value] = parser.parse_object(_depth=_depth + 1)
-    if parser.parse('stream', allow_nonmatch=True, skip_space=False, _depth=_depth):
-        l = result['Length']
-        e = parser.content.find(b'endstream', parser.i + l) - 1
-        result = Stream(result, parser.content[e - l:e])
-        parser._advance(e)
+    if parser.parse('stream', allow_nonmatch=True, skip_space=False, skip_comment=False, _depth=_depth):
+        parser.i += 2
+        end = parser.i+result['Length']
+        result = Stream(result, parser.content[parser.i:end])
+        parser._advance(end)
         parser.parse(r'\s*endstream', _depth=_depth)
     return result
 

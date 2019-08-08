@@ -35,7 +35,7 @@ def transform_dictionary(x):
 
 def transform_stream(x):
     result = transform_dictionary(x.dictionary)
-    result += b'\nstream\n'
+    result += b'\nstream\r\n'
     result += x.stream
     result += b'\nendstream'
     return result

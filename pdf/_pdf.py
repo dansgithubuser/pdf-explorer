@@ -73,11 +73,15 @@ class Pdf:
             # body
             while not parser.check('xref|startxref'):
                 ref = Ref(parser.parse(r'\d+ \d+ obj'))
-                self.objects[ref] = parser.parse_object()
+                try:
+                    self.objects[ref] = parser.parse_object()
+                except:
+                    print('exception while parsing object {}'.format(ref))
+                    raise
                 parser.parse('endobj')
             # cross-reference
             if parser.parse('startxref', allow_nonmatch=True):
-                # stream
+                # stream p49 (7.5.8)
                 startxref = int(parser.parse(r'\d+'))
                 for k, v in self.objects.items():
                     if isinstance(v, Stream) and v.get('Type') == Name('XRef'):
